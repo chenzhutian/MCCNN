@@ -183,6 +183,7 @@ if __name__ == '__main__':
     print("ptDropOut: "+str(args.ptDropOut))
     print("Augment: "+str(args.augment))
     print("Nonunif: "+str(args.nonunif))
+    num_gpus = len(args.gpu.split(','))
 
     #Load the model
     model = importlib.import_module(args.model)
@@ -199,7 +200,7 @@ if __name__ == '__main__':
     
     mTrainDataSet = ShapeNetDataSet(True, args.batchSize, args.ptDropOut, 
         allowedSamplingsTrain, args.augment)
-    mTestDataSet = ShapeNetDataSet(False, 1, 1.0,
+    mTestDataSet = ShapeNetDataSet(False, num_gpus, 1.0,
         allowedSamplingsTest, False)
     
     numTrainModels = mTrainDataSet.get_num_models()
@@ -214,15 +215,13 @@ if __name__ == '__main__':
     print("Train models: " + str(numTrainModels))
     print("Test models: " + str(numTestModels))
 
-
-
     #Create variable and place holders
     global_step = tf.Variable(0, name='global_step', trainable=False)
-    inPts = tf.placeholder(tf.float32, [None, 3])
-    inBatchIds = tf.placeholder(tf.int32, [None, 1])
-    inFeatures = tf.placeholder(tf.float32, [None, 1])
-    inCatLabels = tf.placeholder(tf.int32, [None, 1])
-    inLabels = tf.placeholder(tf.int32, [None, 1])
+    inPts = tf.placeholder(tf.float32, [num_gpus, None, 3])
+    inBatchIds = tf.placeholder(tf.int32, [num_gpus, None, 1])
+    inFeatures = tf.placeholder(tf.float32, [num_gpus, None, 1])
+    inCatLabels = tf.placeholder(tf.int32, [num_gpus, None, 1])
+    inLabels = tf.placeholder(tf.int32, [num_gpus, None, 1])
 
     isTraining = tf.placeholder(tf.bool)
     keepProbConv = tf.placeholder(tf.float32)
@@ -236,8 +235,7 @@ if __name__ == '__main__':
         args.learningDeacyFactor, staircase=True)
     learningRateExp = tf.maximum(learningRateExp, args.maxLearningRate)
     optimizer = tf.train.AdamOptimizer(learning_rate =learningRateExp)
-
-    num_gpus = 2
+    
     inPts_batch = tf.split(inPts, num_gpus, name='input_xyz')
     inBatchIds_batch = tf.split(inBatchIds, num_gpus, name='input_batch_id')
     inFeatures_batch = tf.split(inFeatures, num_gpus, name='input_features')
@@ -254,7 +252,6 @@ if __name__ == '__main__':
     with tf.variable_scope(tf.get_variable_scope()) as outter_scope:
         for i in range(num_gpus):
             with tf.device(assign_to_device('/gpu:%d'%(i), "/cpu:0")), tf.name_scope('gpu_%d' % (i)):
-                
                 logits = model.create_network(
                     inPts_batch[i], inBatchIds_batch[i], inFeatures_batch[i], inCatLabels_batch[i], 
                     1, len(cat), 50, args.batchSize, args.grow, 
@@ -295,16 +292,17 @@ if __name__ == '__main__':
         total_xentropyLoss = tf.reduce_mean(tower_xentropyLoss)
         total_regularizationLoss = tf.reduce_mean(tower_regularizationLoss)
         total_loss = tf.reduce_mean(tower_loss)
+        total_pred = tf.concat(tower_pred, 0)
 
     # trainning, learningRateExp = create_trainning(loss, 
     #     args.initLearningRate, args.maxLearningRate, args.learningDeacyFactor, 
     #     args.learningDecayRate*numBatchesXEpoch, global_step)
 
     #Create predict labels
-    predictedLabels = tf.argmax(logits, 1)
+    predictedLabels = tf.argmax(total_pred, 1)
 
     #Create accuracy metric
-    accuracyVal, accuracyAccumOp = create_accuracy(logits, inLabels, 'metrics')
+    accuracyVal, accuracyAccumOp = create_accuracy(total_pred, tf.reshape(inLabels, [-1, 1]), 'metrics')
     metricsVars = tf.contrib.framework.get_variables('metrics', collection=tf.GraphKeys.LOCAL_VARIABLES)
     resetMetrics = tf.variables_initializer(metricsVars)
 
@@ -322,9 +320,13 @@ if __name__ == '__main__':
     saver = tf.train.Saver()
     
     #Create session
-    gpu_options = tf.GPUOptions(allow_growth=True, visible_device_list=args.gpu)
-    sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
-    
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    config.gpu_options.visible_device_list=args.gpu
+    config.allow_soft_placement = True
+    config.log_device_placement = False
+    sess = tf.Session(config=config)
+
     #Create the summary writer
     summary_writer = tf.summary.FileWriter(args.logFolder, sess.graph)
     summary_writer.add_graph(sess.graph)
@@ -352,7 +354,7 @@ if __name__ == '__main__':
         mTrainDataSet.start_iteration()
         while mTrainDataSet.has_more_batches():
 
-            _, points, batchIds, features, labels, catLabels, _ = mTrainDataSet.get_next_batch()
+            _, points, batchIds, features, labels, catLabels, _ = mTrainDataSet.get_next_batch(num_gpu=num_gpus)
     
             _, lossRes, xentropyLossRes, regularizationLossRes, trainingSummRes, _ = \
                 sess.run([train_op, total_loss, total_xentropyLoss, total_regularizationLoss, trainingSummary, accuracyAccumOp], {
@@ -406,7 +408,7 @@ if __name__ == '__main__':
         mTestDataSet.start_iteration()
         while mTestDataSet.has_more_batches():
 
-            _, points, batchIds, features, labels, catLabels, _ = mTestDataSet.get_next_batch()
+            _, points, batchIds, features, labels, catLabels, _ = mTestDataSet.get_next_batch(num_gpu=num_gpus)
 
             lossRes, predictedLabelsRes, _ = sess.run([total_loss, predictedLabels, accuracyAccumOp], 
                     {
