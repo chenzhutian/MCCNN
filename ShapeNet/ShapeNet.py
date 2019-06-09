@@ -232,7 +232,7 @@ if __name__ == '__main__':
         mTrainDataSet.start_iteration()
         while mTrainDataSet.has_more_batches():
 
-            _, points, batchIds, features, labels, catLabels, _ = mTrainDataSet.get_next_batch()
+            _, points, batchIds, features, labels, catLabels, _, tick = mTrainDataSet.get_next_batch()
     
             _, lossRes, xentropyLossRes, regularizationLossRes, trainingSummRes, _ = \
                 sess.run([trainning, loss, xentropyLoss, regularizationLoss, trainingSummary, accuracyAccumOp], 
@@ -280,7 +280,7 @@ if __name__ == '__main__':
         mTestDataSet.start_iteration()
         while mTestDataSet.has_more_batches():
 
-            _, points, batchIds, features, labels, catLabels, _ = mTestDataSet.get_next_batch()
+            _, points, batchIds, features, labels, catLabels, _, tick = mTestDataSet.get_next_batch()
 
             lossRes, predictedLabelsRes, _ = sess.run([loss, predictedLabels, accuracyAccumOp], 
                     {inPts: points, inBatchIds: batchIds, inFeatures: features, inCatLabels: catLabels, 
