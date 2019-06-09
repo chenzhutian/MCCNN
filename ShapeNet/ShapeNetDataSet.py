@@ -131,8 +131,6 @@ class ShapeNetDataSet(DataSet):
             end = max(idx)
             tick.append((beg, end))
 
-        print(accumPts.shape, accumBatchIds.shape, accumFeatures.shape, accumLabels.shape, accumCat.shape)
-
         return numModelInBatch, accumPts, accumBatchIds, accumFeatures, accumLabels, accumCat, accumPaths, tick
 
     def _load_model_from_disk_(self, modelPath):

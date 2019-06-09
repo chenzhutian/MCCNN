@@ -253,8 +253,8 @@ if __name__ == '__main__':
     with tf.variable_scope(tf.get_variable_scope()) as outter_scope:
         for i in range(num_gpus):
             with tf.device(assign_to_device('/gpu:%d'%(i), "/cpu:0")), tf.name_scope('gpu_%d' % (i)):
-                beg, end = inTick[i]
-
+                beg = inTick[i][0]
+                end = inTick[i][1]+1
                 logits = model.create_network(
                     inPts_batch[beg:end], inBatchIds_batch[beg:end], inFeatures_batch[beg:end], inCatLabels_batch[beg:end], 
                     1, len(cat), 50, args.batchSize, args.grow, 
@@ -365,7 +365,8 @@ if __name__ == '__main__':
                     inBatchIds: batchIds, 
                     inFeatures: features, 
                     inLabels: labels, 
-                    inCatLabels: catLabels, 
+                    inCatLabels: catLabels,
+                    inTick: tick,
                     isTraining: True, 
                     keepProbConv: args.dropOutKeepProbConv, 
                     keepProbFull: args.dropOutKeepProb
@@ -419,7 +420,8 @@ if __name__ == '__main__':
                         inBatchIds: batchIds, 
                         inFeatures: features, 
                         inCatLabels: catLabels, 
-                        inLabels: labels, 
+                        inLabels: labels,
+                        inTick: tick,
                         isTraining: False, 
                         keepProbConv: 1.0, 
                         keepProbFull: 1.0
