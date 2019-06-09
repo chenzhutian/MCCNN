@@ -120,14 +120,20 @@ class ShapeNetDataSet(DataSet):
 
     def get_next_batch(self, num_gpu=1):
         numModelInBatch, accumPts, accumBatchIds, accumFeatures, accumLabels, accumCat, accumPaths = super().get_next_batch()
+        tick = []
 
-        accumPts = np.resize(accumPts, (num_gpu, -1, 3))
-        accumBatchIds = np.resize(accumBatchIds, (num_gpu, -1, 1))
-        accumFeatures = np.resize(accumFeatures, (num_gpu, -1, 1))
-        accumLabels = np.resize(accumLabels, (num_gpu, -1, 1))
-        accumCat = np.resize(accumCat, (num_gpu, -1, 1))
+        model_per_gpu = math.ceil(numModelInBatch / num_gpu)
+        for i in range(num_gpu):
+            beg = i * model_per_gpu
+            end = beg + model_per_gpu
+            idx, _ = np.where((accumBatchIds < end) & (accumBatchIds >= beg))
+            beg = min(idx)
+            end = max(idx)
+            tick.append((beg, end))
 
-        return numModelInBatch, accumPts, accumBatchIds, accumFeatures, accumLabels, accumCat, accumPaths
+        print(accumPts.shape, accumBatchIds.shape, accumFeatures.shape, accumLabels.shape, accumCat.shape)
+
+        return numModelInBatch, accumPts, accumBatchIds, accumFeatures, accumLabels, accumCat, accumPaths, tick
 
     def _load_model_from_disk_(self, modelPath):
         """Abstract method that should be implemented by child class which loads a model

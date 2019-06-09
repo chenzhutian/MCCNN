@@ -217,11 +217,12 @@ if __name__ == '__main__':
 
     #Create variable and place holders
     global_step = tf.Variable(0, name='global_step', trainable=False)
-    inPts = tf.placeholder(tf.float32, [num_gpus, None, 3])
-    inBatchIds = tf.placeholder(tf.int32, [num_gpus, None, 1])
-    inFeatures = tf.placeholder(tf.float32, [num_gpus, None, 1])
-    inCatLabels = tf.placeholder(tf.int32, [num_gpus, None, 1])
-    inLabels = tf.placeholder(tf.int32, [num_gpus, None, 1])
+    inPts = tf.placeholder(tf.float32, [None, 3])
+    inBatchIds = tf.placeholder(tf.int32, [None, 1])
+    inFeatures = tf.placeholder(tf.float32, [None, 1])
+    inCatLabels = tf.placeholder(tf.int32, [None, 1])
+    inLabels = tf.placeholder(tf.int32, [None, 1])
+    inTick = tf.placeholder(tf.int32, [num_gpus, 2])
 
     isTraining = tf.placeholder(tf.bool)
     keepProbConv = tf.placeholder(tf.float32)
@@ -236,11 +237,11 @@ if __name__ == '__main__':
     learningRateExp = tf.maximum(learningRateExp, args.maxLearningRate)
     optimizer = tf.train.AdamOptimizer(learning_rate =learningRateExp)
     
-    inPts_batch = tf.split(inPts, num_gpus, name='input_xyz')
-    inBatchIds_batch = tf.split(inBatchIds, num_gpus, name='input_batch_id')
-    inFeatures_batch = tf.split(inFeatures, num_gpus, name='input_features')
-    inLabels_batch = tf.split(inLabels, num_gpus, name='input_label')
-    inCatLabels_batch = tf.split(inCatLabels, num_gpus, name='input_cat_labels')
+    inPts_batch = inPts # tf.split(inPts, num_gpus, name='input_xyz')
+    inBatchIds_batch = inBatchIds # tf.split(inBatchIds, num_gpus, name='input_batch_id')
+    inFeatures_batch = inFeatures # tf.split(inFeatures, num_gpus, name='input_features')
+    inLabels_batch = inLabels # tf.split(inLabels, num_gpus, name='input_label')
+    inCatLabels_batch = inCatLabels # tf.split(inCatLabels, num_gpus, name='input_cat_labels')
     tower_grads = []
     tower_pred = []
     tower_loss = []
@@ -252,13 +253,15 @@ if __name__ == '__main__':
     with tf.variable_scope(tf.get_variable_scope()) as outter_scope:
         for i in range(num_gpus):
             with tf.device(assign_to_device('/gpu:%d'%(i), "/cpu:0")), tf.name_scope('gpu_%d' % (i)):
+                beg, end = inTick[i]
+
                 logits = model.create_network(
-                    inPts_batch[i], inBatchIds_batch[i], inFeatures_batch[i], inCatLabels_batch[i], 
+                    inPts_batch[beg:end], inBatchIds_batch[beg:end], inFeatures_batch[beg:end], inCatLabels_batch[beg:end], 
                     1, len(cat), 50, args.batchSize, args.grow, 
                     isTraining, keepProbConv, keepProbFull, args.useDropOutConv, args.useDropOut)
 
                 #Create loss
-                xentropyLoss, regularizationLoss = create_loss(logits, inLabels_batch[i], args.weightDecay)
+                xentropyLoss, regularizationLoss = create_loss(logits, inLabels_batch[beg:end], args.weightDecay)
                 loss = xentropyLoss + regularizationLoss
 
                 #Create sumaries
@@ -354,7 +357,7 @@ if __name__ == '__main__':
         mTrainDataSet.start_iteration()
         while mTrainDataSet.has_more_batches():
 
-            _, points, batchIds, features, labels, catLabels, _ = mTrainDataSet.get_next_batch(num_gpu=num_gpus)
+            _, points, batchIds, features, labels, catLabels, _, tick = mTrainDataSet.get_next_batch(num_gpu=num_gpus)
     
             _, lossRes, xentropyLossRes, regularizationLossRes, trainingSummRes, _ = \
                 sess.run([train_op, total_loss, total_xentropyLoss, total_regularizationLoss, trainingSummary, accuracyAccumOp], {
@@ -408,7 +411,7 @@ if __name__ == '__main__':
         mTestDataSet.start_iteration()
         while mTestDataSet.has_more_batches():
 
-            _, points, batchIds, features, labels, catLabels, _ = mTestDataSet.get_next_batch(num_gpu=num_gpus)
+            _, points, batchIds, features, labels, catLabels, _, tick = mTestDataSet.get_next_batch(num_gpu=num_gpus)
 
             lossRes, predictedLabelsRes, _ = sess.run([total_loss, predictedLabels, accuracyAccumOp], 
                     {
