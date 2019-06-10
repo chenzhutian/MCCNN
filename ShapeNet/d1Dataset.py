@@ -24,7 +24,20 @@ sys.path.append(os.path.join(ROOT_DIR, 'utils'))
 from Selection_Dataset import SelectionDataSet
 
 h5_filepaths = [
-    os.path.join('h5_d1', 'MCCNN_d1_a1.h5')
+    '_d1_a1.h5',
+    '_d1_a2.h5',
+    '_d1_a3.h5',
+    '_d1_a4.h5',
+    '_d1_a5.h5',
+    '_d1_a6.h5',
+    '_d1_a7.h5',
+    '_d1_a8.h5',
+    '_d1_a9.h5',
+    '_d1_a11.h5',
+    '_d1_a12.h5',
+    '_d1_a13.h5',
+    '_d1_a14.h5',
+    '_d1_a16.h5',
 ]
 
 CAT_NAME =  ["Airplane", 
@@ -87,7 +100,8 @@ class d1DataSet(SelectionDataSet):
             batchSize=batchSize, allowedSamplings=allowedSamplings,
             augment=augment, augmentSmallRotations=True, seed=seed)
 
-        self.h5_filepaths = h5_filepaths
+        self.h5_filepaths = [os.path.join('h5_d1', 'MCCNN' + ('_train' if train else '_test') + f) for f in h5_filepaths]
+
         self.records = None
         # original
         self.categories_ = None
@@ -100,7 +114,7 @@ class d1DataSet(SelectionDataSet):
         self.record_interval = []
         self.scene_interval = []
 
-        for cls_i, h5_filepath in enumerate(h5_filepaths):
+        for cls_i, h5_filepath in enumerate(self.h5_filepaths):
             # store interval begin
             beg = 0 if self.records is None else len(self.records)
             scene_beg = 0 if self.scenes is None else len(self.scenes)
@@ -143,26 +157,6 @@ class d1DataSet(SelectionDataSet):
         # Get the categories and their associated part ids..
         self.catNames_ = [ CAT_NAME[cls_i] for cls_i, _ in enumerate(h5_filepaths)]
 
-        # should be revised
-        self.segClasses_ = {
-            'Earphone': [0, 1],
-            'Motorbike': [30, 31, 32, 33, 34, 35], 
-            'Rocket': [41, 42, 43], 
-            'Car': [8, 9, 10, 11], 
-            'Laptop': [28, 29], 
-            'Cap': [6, 7], 
-            'Skateboard': [44, 45, 46], 
-            'Mug': [36, 37], 
-            'Guitar': [19, 20, 21], 
-            'Bag': [4, 5], 
-            'Lamp': [24, 25, 26, 27], 
-            'Table': [47, 48, 49], 
-            'Airplane': [0, 1, 2, 3], 
-            'Pistol': [38, 39, 40], 
-            'Chair': [12, 13, 14, 15], 
-            'Knife': [22, 23]
-        }
-
         # Since we do not know the size of the models in advance 
         # we initialize them to 0 and the first that will be loaded
         # this values will be update automatically.
@@ -176,16 +170,6 @@ class d1DataSet(SelectionDataSet):
             pts (nx2 np.array string): List of tuples with the category name and the folder name.
         """
         return self.catNames_
-
-
-    def get_categories_seg_parts(self):
-        """Method to get the list of parts per category.
-            
-        Returns:
-            pts (dict of array): Each entry of the dictionary has a key equal to the name of the
-                category and a list of part identifiers.
-        """
-        return self.segClasses_
 
     def get_next_batch(self, num_gpu=1):
         numModelInBatch, accumPts, accumBatchIds, accumFeatures, accumLabels, accumCat, accumPaths = super().get_next_batch()
@@ -211,7 +195,20 @@ class d1DataSet(SelectionDataSet):
 
 if __name__ == "__main__":
     dataset = d1DataSet(True, batchSize=32, ptDropOut=0.8, allowedSamplings=[0], augment=False)
-    print(dataset.get_num_models(), dataset.get_categories(), dataset.get_categories_seg_parts())
+    print(dataset.get_num_models(), dataset.get_categories())
+    # dataset.start_iteration()
+    numModelInBatch, accumPts, accumBatchIds, accumFeatures, accumLabels, accumCat, accumPaths, tick = dataset.get_next_batch(num_gpu=2)
+    print(numModelInBatch)
+    print('accumPts.shape', accumPts.shape)
+    print('accumBatchIds.shape', accumBatchIds.shape)
+    print('accumFeatures.shape', accumFeatures.shape)
+    print('accumLabels.shape', accumLabels.shape)
+    print('accumCat.shape', accumCat.shape)
+    print(accumPaths)
+    print(tick)
+
+    dataset = d1DataSet(False, batchSize=32, ptDropOut=0.8, allowedSamplings=[0], augment=False)
+    print(dataset.get_num_models(), dataset.get_categories())
     # dataset.start_iteration()
     numModelInBatch, accumPts, accumBatchIds, accumFeatures, accumLabels, accumCat, accumPaths, tick = dataset.get_next_batch(num_gpu=2)
     print(numModelInBatch)

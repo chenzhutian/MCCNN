@@ -8,12 +8,13 @@ import json
 from pymongo import MongoClient
 import numpy as np
 import h5py
+import math
 
 PTX_DIR = path.join('../..', '2019-scivis-3dselection-label-tool', 'datasets', 'converted_d1')
 OUTPUT_DIR = path.join('.', 'h5_d1')
 if not path.isdir(OUTPUT_DIR):
     os.mkdir(OUTPUT_DIR)
-CONVERT_AREA_COUNT = 1 # 16
+CONVERT_AREA_COUNT = 16
 mongo_url='mongodb://127.0.0.1:27016'
 db_name='pcSelection5'
 collection_name='records'
@@ -229,5 +230,16 @@ if __name__ == "__main__":
         print('finish ', aId)
         if results is not None:
             record, target, record_2_scene, scene, record_2_cam_pos, recrod_2_highlight = results
-            save_h5(path.join(OUTPUT_DIR, 'MCCNN_' + dataset_prefix[:-1] +'.h5'), record, target, record_2_scene, scene, record_2_cam_pos, recrod_2_highlight)
+            # split
+            indices = np.random.permutation(len(record))
+            tick = math.floor(0.9 * len(record))
+            train_idx, test_idx = indices[:tick], indices[tick:]
+            train_record, test_record = record[train_idx], record[test_idx]
+            train_target, test_target = target[train_idx], target[test_idx]
+            train_record_2_scene, test_record_2_scene = record_2_scene[train_idx], record_2_scene[test_idx]
+            train_record_2_cam_pos, test_record_2_cam_pos = record_2_cam_pos[train_idx, :], record_2_cam_pos[test_idx, :]
+            train_record_2_hl, test_record_2_hl = recrod_2_highlight[train_idx], recrod_2_highlight[test_idx]
+            save_h5(path.join(OUTPUT_DIR, 'MCCNN_train_' + dataset_prefix[:-1] +'.h5'), train_record, train_target, train_record_2_scene, scene, train_record_2_cam_pos, train_record_2_hl)
+            save_h5(path.join(OUTPUT_DIR, 'MCCNN_test_' + dataset_prefix[:-1] +'.h5'), test_record, test_target, test_record_2_scene, scene, test_record_2_cam_pos, test_record_2_hl)
+            # save_h5(path.join(OUTPUT_DIR, 'MCCNN_' + dataset_prefix[:-1] +'.h5'), record, target, record_2_scene, scene, record_2_cam_pos, recrod_2_highlight)
         
