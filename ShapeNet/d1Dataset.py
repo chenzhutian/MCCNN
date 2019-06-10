@@ -21,7 +21,7 @@ import h5py
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(os.path.join(ROOT_DIR, 'utils'))
-from DataSet import DataSet
+from Selection_Dataset import SelectionDataSet
 
 h5_filepaths = []
 
@@ -34,7 +34,7 @@ def concat(main, sub):
     else:
         return sub if main is None else np.concatenate((main, sub), axis=0)
 
-class d1DataSet(DataSet):
+class d1DataSet(SelectionDataSet):
     """d1 dataset.
 
     Attributes: 
@@ -69,19 +69,15 @@ class d1DataSet(DataSet):
         # Store the parameters of the class.
         self.useNormalsAsFeatures_ = useNormalsAsFeatures
 
-        # Create the list of features that need to be augmented.
-        augmentedFeatures = []
-        if useNormalsAsFeatures:
-            augmentedFeatures = [0]
-
         # Call the constructor of the parent class.
         super(d1DataSet,self).__init__(0, ptDropOut, useNormalsAsFeatures, True, True,
             True, True, batchSize, allowedSamplings, 100000000, 0,
-            augment, 1, True, False, augmentedFeatures, [], seed)
+            augment, 1, True, False, [], [], seed)
 
         self.h5_filepaths = h5_filepaths
         self.records = None
-        self.record_2_cls = None
+        # original
+        self.categories_ = None
         self.targets = None
         self.record_2_scene = None
         self.scenes = None
@@ -111,7 +107,7 @@ class d1DataSet(DataSet):
             self.scenes = concat(self.scenes, [s for s in tmp_scenes]) 
             self.record_2_cam_params = concat(self.record_2_cam_params, tmp_record_2_cam_params)
             self.record_2_hl = concat(self.record_2_hl, tmp_record_2_hl)
-            self.record_2_cls = concat(self.record_2_cls, tmp_record_2_cls)
+            self.categories_ = concat(self.categories_, tmp_record_2_cls)
 
             # update interval with end
             self.record_interval.append((beg, len(self.records)))
@@ -129,39 +125,49 @@ class d1DataSet(DataSet):
             'record_2_cam_params.shape:', self.record_2_cam_params.shape)
 
         # Get the categories and their associated part ids..
-        self.catNames_ = []
-        with open("./shape_data/synsetoffset2category.txt", 'r') as nameFile:
-            for line in nameFile:
-                strings = line.replace("\n", "").split("\t")
-                self.catNames_.append((strings[0], strings[1]))
+        self.catNames_ = [
+            ["Airplane", "02691156"],
+            ["Bag",     "02773838"],
+            ["Cap",     "02954340"],
+            ["Car",    "02958343"],
+            ["Chair",   "03001627"],
+            ["Earphone", "03261776"],
+            ["Guitar",  "03467517"],
+            ["Knife",   "03624134"],
+            ["Lamp",    "03636649"],
+            ["Motorbike", "03790512"],
+            ["Mug",     "03797390"],
+            ["Pistol",  "03948459"],
+            ["Rocket",  "04099429"],
+            ["Table",   "04379243"],
+        ]
 
-        self.segClasses_ = {'Earphone': [16, 17, 18], 'Motorbike': [30, 31, 32, 33, 34, 35], 'Rocket': [41, 42, 43], 'Car': [8, 9, 10, 11], 'Laptop': [28, 29], 
-            'Cap': [6, 7], 'Skateboard': [44, 45, 46], 'Mug': [36, 37], 'Guitar': [19, 20, 21], 'Bag': [4, 5], 'Lamp': [24, 25, 26, 27], 'Table': [47, 48, 49], 
-            'Airplane': [0, 1, 2, 3], 'Pistol': [38, 39, 40], 'Chair': [12, 13, 14, 15], 'Knife': [22, 23]}
+        # should be revised
+        self.segClasses_ = {
+            'Earphone': [16, 17, 18], 
+            'Motorbike': [30, 31, 32, 33, 34, 35], 
+            'Rocket': [41, 42, 43], 
+            'Car': [8, 9, 10, 11], 
+            'Laptop': [28, 29], 
+            'Cap': [6, 7], 
+            'Skateboard': [44, 45, 46], 
+            'Mug': [36, 37], 
+            'Guitar': [19, 20, 21], 
+            'Bag': [4, 5], 
+            'Lamp': [24, 25, 26, 27], 
+            'Table': [47, 48, 49], 
+            'Airplane': [0, 1, 2, 3], 
+            'Pistol': [38, 39, 40], 
+            'Chair': [12, 13, 14, 15], 
+            'Knife': [22, 23]
+        }
 
-        # List of files.
-        if train:
-            with open("./shape_data/train_test_split/shuffled_train_file_list.json", 'r') as f:
-                self.fileList_ = list([d for d in json.load(f)])
-            with open("./shape_data/train_test_split/shuffled_val_file_list.json", 'r') as f:
-                self.fileList_ = self.fileList_ + list([d for d in json.load(f)])
-        else:
-            with open("./shape_data/train_test_split/shuffled_test_file_list.json", 'r') as f:
-                self.fileList_ = list([d for d in json.load(f)])
-
-        # Check the categories per model.
-        for currModel in self.fileList_:
-            catId = 0
-            for currCat in range(len(self.catNames_)):
-                if self.catNames_[currCat][1] in currModel:
-                    catId = currCat
-            self.categories_.append(catId)
-
-        # Since we do not know the size of the models in advance we initialize them to 0 and the first that will be loaded
+        # Since we do not know the size of the models in advance 
+        # we initialize them to 0 and the first that will be loaded
         # this values will be update automatically.
-        self.numPts_ = [0 for i in range(len(self.fileList_))] 
+        self.numPts_ = [len(self.scenes[scene_idx]) for scene_idx in self.record_2_scene]
+        self.recordList_ = range(len(self.records))
 
-    
     def get_categories(self):
         """Method to get the list of categories.
             
@@ -195,38 +201,10 @@ class d1DataSet(DataSet):
 
         return numModelInBatch, accumPts, accumBatchIds, accumFeatures, accumLabels, accumCat, accumPaths, tick
 
-    def _load_model_from_disk_(self, modelPath):
-        """Abstract method that should be implemented by child class which loads a model
-            from disk.
+    def _load_model(self, record_idx):
+        scene_idx = self.record_2_scene[record_idx]
+        pts = self.scenes[scene_idx]
+        features = self.records[record_idx]
+        labels = self.targets[record_idx]
 
-        Args:
-            modelPath (string): Path to the model that needs to be loaded.
-
-        Returns:
-            pts (nx3 np.array): List of points.
-            normals (nx3 np.array): List of normals. If the dataset does not contain 
-                normals, None should be returned.
-            features (nxm np.array): List of features. If the dataset does not contain
-                features, None should be returned.
-            labels (nxl np.array): List of labels. If the dataset does not contain
-                labels, None should be returned.
-        """
-        
-        fileDataArray = []
-        with open(modelPath+".txt", 'r') as modelFile:        
-            for line in modelFile:
-                line = line.replace("\n", "")
-                currPoint = line.split()
-                fileDataArray.append([float(currPoint[0]), float(currPoint[1]), 
-                    float(currPoint[2]), float(currPoint[3]), float(currPoint[4]), 
-                    float(currPoint[5]), float(currPoint[6])])
-        fileData = np.array(fileDataArray)
-
-        pts = fileData[:,0:3]
-        normals = fileData[:,3:6]
-        features = None
-        if self.useNormalsAsFeatures_:
-            features = normals
-        labels = fileData[:,6:7]
-
-        return  pts, normals, features, labels
+        return  pts, None, features, labels
