@@ -27,6 +27,21 @@ h5_filepaths = [
     os.path.join('h5_d1', 'MCCNN_d1_a1.h5')
 ]
 
+CAT_NAME =  ["Airplane", 
+            "Bag",     
+            "Cap",     
+            "Car",    
+            "Chair",   
+            "Earphone", 
+            "Guitar",  
+            "Knife",   
+            "Lamp",    
+            "Motorbike",
+            "Mug",     
+            "Pistol",  
+            "Rocket",  
+            "Table"]
+
 def concat(main, sub):
     if type(main) is list:
         if type(sub) is not list:
@@ -126,26 +141,11 @@ class d1DataSet(SelectionDataSet):
             'record_2_cam_params.shape:', self.record_2_cam_params.shape)
 
         # Get the categories and their associated part ids..
-        self.catNames_ = [
-            ["Airplane", "02691156"],
-            ["Bag",     "02773838"],
-            ["Cap",     "02954340"],
-            ["Car",    "02958343"],
-            ["Chair",   "03001627"],
-            ["Earphone", "03261776"],
-            ["Guitar",  "03467517"],
-            ["Knife",   "03624134"],
-            ["Lamp",    "03636649"],
-            ["Motorbike", "03790512"],
-            ["Mug",     "03797390"],
-            ["Pistol",  "03948459"],
-            ["Rocket",  "04099429"],
-            ["Table",   "04379243"],
-        ]
+        self.catNames_ = [ CAT_NAME[cls_i] for cls_i, _ in enumerate(h5_filepaths)]
 
         # should be revised
         self.segClasses_ = {
-            'Earphone': [16, 17, 18], 
+            'Earphone': [0, 1],
             'Motorbike': [30, 31, 32, 33, 34, 35], 
             'Rocket': [41, 42, 43], 
             'Car': [8, 9, 10, 11], 

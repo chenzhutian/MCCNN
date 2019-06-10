@@ -25,7 +25,7 @@ sys.path.append(os.path.join(ROOT_DIR, 'models'))
 sys.path.append(os.path.join(ROOT_DIR, 'utils'))
 
 from PyUtils import visualize_progress
-from ShapeNetDataSet import ShapeNetDataSet
+from d1Dataset import d1DataSet
 
 current_milli_time = lambda: time.time() * 1000.0
 
@@ -198,9 +198,9 @@ if __name__ == '__main__':
         allowedSamplingsTrain = [0]
         allowedSamplingsTest = [0]
     
-    mTrainDataSet = ShapeNetDataSet(True, args.batchSize, args.ptDropOut, 
+    mTrainDataSet = d1DataSet(True, args.batchSize, args.ptDropOut, 
         allowedSamplingsTrain, args.augment)
-    mTestDataSet = ShapeNetDataSet(False, num_gpus, 1.0,
+    mTestDataSet = d1DataSet(False, num_gpus, 1.0,
         allowedSamplingsTest, False)
     
     numTrainModels = mTrainDataSet.get_num_models()
@@ -297,10 +297,6 @@ if __name__ == '__main__':
         total_loss = tf.reduce_mean(tower_loss)
         total_pred = tf.concat(tower_pred, 0)
 
-    # trainning, learningRateExp = create_trainning(loss, 
-    #     args.initLearningRate, args.maxLearningRate, args.learningDeacyFactor, 
-    #     args.learningDecayRate*numBatchesXEpoch, global_step)
-
     #Create predict labels
     predictedLabels = tf.argmax(total_pred, 1)
 
@@ -315,13 +311,9 @@ if __name__ == '__main__':
     metricsSummary = tf.summary.scalar('accuracy', accuracyVal)
     metricsTestSummary = tf.summary.merge([tf.summary.scalar('Tes_Accuracy', accuracyVal), tf.summary.scalar('Test_IoU', iouVal)], name='TestMetrics')
 
-    #Create init variables 
-    init = tf.global_variables_initializer()
-    initLocal = tf.local_variables_initializer()
-
     #create the saver
     saver = tf.train.Saver()
-    
+
     #Create session
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -333,14 +325,14 @@ if __name__ == '__main__':
     #Create the summary writer
     summary_writer = tf.summary.FileWriter(args.logFolder, sess.graph)
     summary_writer.add_graph(sess.graph)
-    
+
     #Init variables
-    sess.run(init)
-    sess.run(initLocal)
+    sess.run(tf.global_variables_initializer())
+    sess.run(tf.local_variables_initializer())
     step = 0
     epochStep = 0
     np.random.seed(int(time.time()))
-    
+
     #Train
     for epoch in range(args.maxEpoch):
 
@@ -412,7 +404,7 @@ if __name__ == '__main__':
         mTestDataSet.start_iteration()
         while mTestDataSet.has_more_batches():
 
-            _, points, batchIds, features, labels, catLabels, _, tick = mTestDataSet.get_next_batch(num_gpu=num_gpus)
+            numModelInBatch, points, batchIds, features, labels, catLabels, _, tick = mTestDataSet.get_next_batch(num_gpu=num_gpus)
 
             lossRes, predictedLabelsRes, _ = sess.run([total_loss, predictedLabels, accuracyAccumOp], 
                     {
@@ -430,24 +422,20 @@ if __name__ == '__main__':
             accumTestLoss = accumTestLoss + lossRes
             
             #Compute IoU
-            numParts = len(segClasses[cat[catLabels[0][0]][0]])
-            accumIoU = 0.0
-            for j in range(numParts):
-                intersection = 0.0
-                union = 0.0
-                currLabel = segClasses[cat[catLabels[0][0]][0]][j]
-                for k in range(len(labels)):
-                    if labels[k] == predictedLabelsRes[k] and labels[k] == currLabel:
-                        intersection = intersection + 1.0
-                    if labels[k] == currLabel or predictedLabelsRes[k] == currLabel:
-                        union = union + 1.0
+            for j in range(numModelInBatch):
+                model_idx, _ = np.where(batchIds)
+                T1 = labels[model_idx]
+                T2 = predictedLabelsRes[model_idx]
+                intersection = (T1 & T2).sum()
+                union = (T1 | T2).sum()
+                accumIoU = 0.0
                 if union > 0.0:
-                    accumIoU = accumIoU + intersection/union
+                    accumIoU += intersection/union
                 else:
-                    accumIoU = accumIoU + 1.0
-            accumIoU = accumIoU/float(numParts)
-            IoUxCat[catLabels[0][0]].append(accumIoU)
-            
+                    accumIoU += 1.0
+                cat_idx = np.unique(catLabels[model_idx])[0]
+                IoUxCat[cat_idx].append(accumIoU)
+
             if it%100 == 0:
                 visualize_progress(it, numTestModels)
 
