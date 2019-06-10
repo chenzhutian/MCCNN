@@ -210,8 +210,6 @@ if __name__ == '__main__':
     numTestModels = mTestDataSet.get_num_models()
 
     cat = mTrainDataSet.get_categories()
-    segClasses = mTrainDataSet.get_categories_seg_parts()
-    print(segClasses)
     print("Train models: " + str(numTrainModels))
     print("Test models: " + str(numTestModels))
 
@@ -270,9 +268,6 @@ if __name__ == '__main__':
                     tf.summary.scalar('loss_XEntropy', xentropyLoss),
                     tf.summary.scalar('loss_Regularization', regularizationLoss)
                 ])
-                # lossSummary =
-                # xEntropyLossSummary = 
-                # regularizationLossSummary = 
 
                 with tf.name_scope("compute_gradients"):
                     tower_grads.append(optimizer.compute_gradients(loss))
@@ -351,8 +346,8 @@ if __name__ == '__main__':
 
             _, points, batchIds, features, labels, catLabels, _, tick = mTrainDataSet.get_next_batch(num_gpu=num_gpus)
     
-            _, lossRes, xentropyLossRes, regularizationLossRes, trainingSummRes, _ = \
-                sess.run([train_op, total_loss, total_xentropyLoss, total_regularizationLoss, trainingSummary, accuracyAccumOp], {
+            _, lossRes, trainingSummRes, _ = \
+                sess.run([train_op, total_loss, trainingSummary, accuracyAccumOp], {
                     inPts: points, 
                     inBatchIds: batchIds, 
                     inFeatures: features, 
@@ -423,7 +418,7 @@ if __name__ == '__main__':
             
             #Compute IoU
             for j in range(numModelInBatch):
-                model_idx, _ = np.where(batchIds)
+                model_idx, _ = np.where(batchIds == j)
                 T1 = labels[model_idx]
                 T2 = predictedLabelsRes[model_idx]
                 intersection = (T1 & T2).sum()
