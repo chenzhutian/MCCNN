@@ -69,10 +69,6 @@ class SelectionDataSet(with_metaclass(abc.ABCMeta)):
         cacheCurrNumPts (int): Number of points stored in the cache.
         cacheAddedOrder_ (deque of strings): List of last accessed models. The first element of the queue was the last 
             queried model.
-        ptsCache_ (dict of arrays): Cache of point lists.
-        normalsCache_ (dict of arrays): Cache of normals lists.
-        featureCache_ (dict of arrays): Cache of feature lists.
-        labelsCache_ (dict of arrays): Cache of labels lists.
         iterator_ (int): Iterator pointing at the next model to process in the randomSelection_ list.
         randomState_ (random state): Numpy random state used to generate random numbers.
     """
@@ -296,12 +292,12 @@ class SelectionDataSet(with_metaclass(abc.ABCMeta)):
         
         # Return the result.
         auxOutPts = points[choice]
-        auxOutInFeatures = None
-        if not(inFeatures is None):
-            auxOutInFeatures =  inFeatures[choice]
-        auxOutInLabels = None
-        if not(inLabels is None):
-            auxOutInLabels = inLabels[choice]
+        auxOutInFeatures = inFeatures[choice] if inFeatures is not None else None
+        # if not(inFeatures is None):
+        #     auxOutInFeatures =  inFeatures[choice]
+        auxOutInLabels = inLabels[choice] if inLabels is not None else None
+        # if not(inLabels is None):
+        #     auxOutInLabels = inLabels[choice]
         return auxOutPts, auxOutInFeatures, auxOutInLabels
 
 
@@ -625,15 +621,6 @@ class SelectionDataSet(with_metaclass(abc.ABCMeta)):
 
         self.allowedSamplings_ = allowedSamplings
         
-
-    def reset_caches(self):
-        """Method to reset the caches.
-        """
-        self.cacheCurrNumPts = 0
-        self.cacheAddedOrder_ = deque([])
-        self.cache_ = {}
-
-
     def start_iteration(self):
         """Method to start an iteration over the models.
         """
@@ -698,7 +685,6 @@ class SelectionDataSet(with_metaclass(abc.ABCMeta)):
 
                     # Load the current model from disk or the cache.
                     currPts, currNormals, currFeatures, currLabels = self._load_model_(currRecordIdx)
-
                     # Sample the model.
                     samplingProtocol = self.randomState_.choice(self.allowedSamplings_)
                     if samplingProtocol == 0:
@@ -739,13 +725,16 @@ class SelectionDataSet(with_metaclass(abc.ABCMeta)):
                     accumPts = np.concatenate((accumPts, currPts), axis=0) if accumPts.size else currPts
                     auxBatchIds = np.array([[i] for it in range(len(currPts))])
                     accumBatchIds = np.concatenate((accumBatchIds, auxBatchIds), axis=0) if accumBatchIds.size else auxBatchIds
+                    # use features
                     if self.pointFeatures_:
                         accumFeatures = np.concatenate((accumFeatures, currFeatures), axis=0) if accumFeatures.size else currFeatures
                     else:
                         auxFeatures = np.array([[1.0] for it in range(len(currPts))])
                         accumFeatures = np.concatenate((accumFeatures, auxFeatures), axis=0) if accumFeatures.size else auxFeatures
+                    # use label
                     if self.pointLabels_:
                         accumLabels = np.concatenate((accumLabels, currLabels), axis=0) if accumLabels.size else currLabels
+                    # Categories
                     if self.useCategories_:
                         if self.pointCategories_:
                             auxCategories =  np.array([[currModelCat] for it in range(len(currPts))])
@@ -762,5 +751,5 @@ class SelectionDataSet(with_metaclass(abc.ABCMeta)):
 
         if repeatModelInBatch:
             self.iterator_ += 1
-            
+        
         return numModelInBatch, accumPts, accumBatchIds, accumFeatures, accumLabels, accumCat, accumPaths

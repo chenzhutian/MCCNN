@@ -9,11 +9,11 @@ from pymongo import MongoClient
 import numpy as np
 import h5py
 
-PTX_DIR = path.join('..', '2019-scivis-3dselection-label-tool', 'datasets', 'converted_d1')
+PTX_DIR = path.join('../..', '2019-scivis-3dselection-label-tool', 'datasets', 'converted_d1')
 OUTPUT_DIR = path.join('.', 'h5_d1')
 if not path.isdir(OUTPUT_DIR):
     os.mkdir(OUTPUT_DIR)
-CONVERT_AREA_COUNT = 16
+CONVERT_AREA_COUNT = 1 # 16
 mongo_url='mongodb://127.0.0.1:27016'
 db_name='pcSelection5'
 collection_name='records'
@@ -143,10 +143,10 @@ def convert_mongo_to_numpy(dataset_prefix):
                     print(e)
         # printProgressBar(i + 1, records_count, prefix = pcId+':', suffix = 'Complete', length = 50)
 
-    features = np.array(features, dtype=np.bool)
-    labels = np.array(labels, dtype=np.bool)
+    features = np.array(features, dtype=np.object)
+    labels = np.array(labels, dtype=np.object)
     record_2_scene = np.array(record_2_scene, dtype=np.uint16)
-    scenes = np.array(scenes, dtype=np.float32)
+    scenes = np.array(scenes, dtype=np.object)
     record_2_cam_pos = np.array(record_2_cam_pos, dtype=np.float32)
     recrod_2_highlight = np.array(recrod_2_highlight, dtype=np.uint8)
 
@@ -174,14 +174,20 @@ def save_h5(h5_filename, record, target, record_2_scene, scene, record_2_cam_pos
     print("recrod_2_highlight: %f gb" % (recrod_2_highlight.size * recrod_2_highlight.itemsize / unit_factor))
 
     h5_fout = h5py.File(h5_filename)
+    dt_bool = h5py.special_dtype(vlen=np.dtype('bool'))
     h5_fout.create_dataset('record', data=record,               
-            compression='gzip', compression_opts=4, dtype='bool')
+            compression='gzip', compression_opts=4, dtype=dt_bool)
     h5_fout.create_dataset('target', data=target,
-            compression='gzip', compression_opts=4, dtype='bool')
+            compression='gzip', compression_opts=4, dtype=dt_bool)
     h5_fout.create_dataset('record_2_scene', data=record_2_scene,
             compression='gzip', compression_opts=4, dtype='uint16')
-    h5_fout.create_dataset('scene', data=scene,
-            compression='gzip', compression_opts=4, dtype='float32')
+    dt_float = h5py.special_dtype(vlen=np.dtype('float32'))
+    # convert scene to a 1-d array
+    flat_scenes = []
+    for s in scene:
+        flat_scenes.append(s.flatten())
+    h5_fout.create_dataset('scene', data=np.array(flat_scenes, dtype=np.object),
+            compression='gzip', compression_opts=4, dtype=dt_float)
     h5_fout.create_dataset('record_2_cam_pos', data=record_2_cam_pos,
             compression='gzip', compression_opts=4, dtype='float32')
     h5_fout.create_dataset('recrod_2_highlight', data=recrod_2_highlight,
