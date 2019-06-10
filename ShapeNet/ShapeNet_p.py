@@ -441,10 +441,10 @@ if __name__ == '__main__':
         for i in range(len(IoUxCat)):
             currMean = 0.0
             for currVal in IoUxCat[i]:
-                currMean = currMean + currVal
+                currMean += currVal
             currMean = currMean / float(len(IoUxCat[i]))
-            print("Mean IoU category "+cat[i][0]+": "+str(currMean))
-            meanIoUxCat = meanIoUxCat + currMean*float(len(IoUxCat[i]))
+            print("Mean IoU category "+cat[i]+": "+str(currMean))
+            meanIoUxCat += currMean*float(len(IoUxCat[i]))
         meanIoUxCat = meanIoUxCat / float(numTestModels)
 
         totalAccuracy, metricsTestSummRes = sess.run([accuracyVal, metricsTestSummary], {iouVal: meanIoUxCat})
