@@ -25,7 +25,7 @@ sys.path.append(os.path.join(ROOT_DIR, 'models'))
 sys.path.append(os.path.join(ROOT_DIR, 'utils'))
 
 from PyUtils import visualize_progress
-from d1Dataset import d1Dataset
+from d1Dataset import d1DataSet
 
 current_milli_time = lambda: time.time() * 1000.0
 
