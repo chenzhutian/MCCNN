@@ -168,3 +168,17 @@ class ShapeNetDataSet(DataSet):
         labels = fileData[:,6:7]
             
         return  pts, normals, features, labels
+
+if __name__ == "__main__":
+    dataset = ShapeNetDataSet(False, 1, 1.0, [0], False)
+    print(dataset.get_num_models(), dataset.get_categories())
+    # dataset.start_iteration()
+    numModelInBatch, accumPts, accumBatchIds, accumFeatures, accumLabels, accumCat, accumPaths, tick = dataset.get_next_batch()
+    print(numModelInBatch)
+    print('accumPts.shape', accumPts.shape)
+    print('accumBatchIds.shape', accumBatchIds.shape)
+    print('accumFeatures.shape', accumFeatures.shape)
+    print('accumLabels.shape', accumLabels.shape)
+    print('accumCat.shape', accumCat.shape)
+    print(accumPaths)
+    print(tick)
