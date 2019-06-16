@@ -135,9 +135,9 @@ if __name__ == '__main__':
         allowedSamplingsTrain = [0]
         allowedSamplingsTest = [0]
     
-    mTrainDataSet = d1Dataset(True, args.batchSize, args.ptDropOut, 
+    mTrainDataSet = d1DataSet(True, args.batchSize, args.ptDropOut, 
         allowedSamplingsTrain, args.augment)
-    mTestDataSet = d1Dataset(False, 1, 1.0,
+    mTestDataSet = d1DataSet(False, 1, 1.0,
         allowedSamplingsTest, False)
     
     numTrainModels = mTrainDataSet.get_num_models()
