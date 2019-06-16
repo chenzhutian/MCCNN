@@ -147,8 +147,6 @@ if __name__ == '__main__':
     numTestModels = mTestDataSet.get_num_models()
 
     cat = mTrainDataSet.get_categories()
-    segClasses = mTrainDataSet.get_categories_seg_parts()
-    print(segClasses)
     print("Train models: " + str(numTrainModels))
     print("Test models: " + str(numTestModels))
 
@@ -280,7 +278,7 @@ if __name__ == '__main__':
         mTestDataSet.start_iteration()
         while mTestDataSet.has_more_batches():
 
-            _, points, batchIds, features, labels, catLabels, _, tick = mTestDataSet.get_next_batch()
+            numModelInBatch, points, batchIds, features, labels, catLabels, _, tick = mTestDataSet.get_next_batch()
 
             lossRes, predictedLabelsRes, _ = sess.run([loss, predictedLabels, accuracyAccumOp], 
                     {inPts: points, inBatchIds: batchIds, inFeatures: features, inCatLabels: catLabels, 
@@ -289,22 +287,32 @@ if __name__ == '__main__':
             accumTestLoss = accumTestLoss + lossRes
             
             #Compute IoU
-            numParts = len(segClasses[cat[catLabels[0][0]][0]])
+            # numParts = len(segClasses[cat[catLabels[0][0]][0]])
             accumIoU = 0.0
-            for j in range(numParts):
-                intersection = 0.0
-                union = 0.0
-                currLabel = segClasses[cat[catLabels[0][0]][0]][j]
-                for k in range(len(labels)):
-                    if labels[k] == predictedLabelsRes[k] and labels[k] == currLabel:
-                        intersection = intersection + 1.0
-                    if labels[k] == currLabel or predictedLabelsRes[k] == currLabel:
-                        union = union + 1.0
-                if union > 0.0:
-                    accumIoU = accumIoU + intersection/union
-                else:
-                    accumIoU = accumIoU + 1.0
-            accumIoU = accumIoU/float(numParts)
+            T1 = labels
+            T2 = predictedLabelsRes
+            intersection = (T1 & T2).sum()
+            union = (T1 | T2).sum()
+            accumIoU = 0.0
+            if union > 0.0:
+                accumIoU += intersection/union
+            else:
+                accumIoU += 1.0
+
+            # for j in range(numModelInBatch):
+            #     intersection = 0.0
+            #     union = 0.0
+            #     currLabel = segClasses[cat[catLabels[0][0]][0]][j]
+            #     for k in range(len(labels)):
+            #         if labels[k] == predictedLabelsRes[k] and labels[k] == currLabel:
+            #             intersection = intersection + 1.0
+            #         if labels[k] == currLabel or predictedLabelsRes[k] == currLabel:
+            #             union = union + 1.0
+            #     if union > 0.0:
+            #         accumIoU = accumIoU + intersection/union
+            #     else:
+            #         accumIoU = accumIoU + 1.0
+            # accumIoU = accumIoU/float(numParts)
             IoUxCat[catLabels[0][0]].append(accumIoU)
             
             if it%100 == 0:
